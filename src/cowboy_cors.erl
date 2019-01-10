@@ -24,71 +24,98 @@
 
 %% @private
 execute(Req, Env) ->
-    {_, Policy} = lists:keyfind(cors_policy, 1, Env),
-    {Method, Req1} = cowboy_req:method(Req),
-    origin_present(Req1, #state{env = Env, policy = Policy, method = Method}).
+    ct:log("execute"),
+    Policy = maps:get(cors_policy, Env),
+    Method = cowboy_req:method(Req),
+    origin_present(Req, #state{env = Env, policy = Policy, method = Method}).
 
 %% CORS specification only applies to requests with an `Origin' header.
 origin_present(Req, State) ->
+    ct:log("Origin present"),
     case cowboy_req:header(<<"origin">>, Req) of
-        {undefined, Req1} ->
-            terminate(Req1, State);
-        {Origin, Req1} ->
-            policy_init(Req1, State#state{origin = Origin})
+        undefined ->
+            terminate(Req, State);
+        Origin ->
+            policy_init(Req, State#state{origin = Origin})
     end.
 
 policy_init(Req, State = #state{policy = Policy}) ->
     try Policy:policy_init(Req) of
         {ok, Req1, PolicyState} ->
-            allowed_origins(Req1, State#state{policy_state = PolicyState})
-    catch Class:Reason ->
+            ct:pal("~p, trying to call ~p:policy_init", [?FUNCTION_NAME, Policy]),
+            Res = allowed_origins(Req1, State#state{policy_state = PolicyState}),
+            ct:pal("called policy_init successfuly"),
+            Res
+    catch Class:Reason:Stacktrace ->
                 error_logger:error_msg(
                   "** Cowboy CORS policy ~p terminating in ~p/~p~n"
                   "   for the reason ~p:~p~n"
                   "** Request was ~p~n** Stacktrace: ~p~n~n",
                   [Policy, policy_init, 1, Class, Reason,
-                   cowboy_req:to_list(Req), erlang:get_stacktrace()]),
+                   Req, Stacktrace]),
             error_terminate(Req, State)
     end.
 
 %% allowed_origins/2 should return a list of origins or the atom '*'
 allowed_origins(Req, State = #state{origin = Origin}) ->
     case call(Req, State, allowed_origins, []) of
-        {'*', Req1, PolicyState} ->
-            request_method(Req1, State#state{policy_state = PolicyState});
-        {List, Req1, PolicyState} ->
+        {'*', PolicyState} ->
+            request_method(Req, State#state{policy_state = PolicyState});
+        {List, PolicyState} ->
             case lists:member(Origin, List) of
                 true ->
-                    request_method(Req1, State#state{policy_state = PolicyState});
+                    ct:pal("Origin is here"),
+                    request_method(Req, State#state{policy_state = PolicyState});
                 false ->
+                    ct:pal("Origin is not here"),
                     terminate(Req, State#state{policy_state = PolicyState})
             end
     end.
 
 request_method(Req, State = #state{method = <<"OPTIONS">>}) ->
     case cowboy_req:header(<<"access-control-request-method">>, Req) of
-        {undefined, Req1} ->
+        undefined ->
             %% This is not a pre-flight request, but an actual request.
-            exposed_headers(Req1, State);
-        {Data, Req1} ->
-            cowboy_http:token(Data,
+            exposed_headers(Req, State);
+        Data ->
+            token(Data,
                               fun(<<>>, Method) ->
-                                      request_headers(Req1, State#state{preflight = true,
+                                      request_headers(Req, State#state{preflight = true,
                                                                         request_method = Method});
                                  (_, _) ->
-                                      terminate(Req1, State)
+                                      terminate(Req, State)
                               end)
     end;
 request_method(Req, State) ->
     exposed_headers(Req, State).
 
+token(Data, Fun) ->
+	token(Data, Fun, cs, <<>>).
+
+-spec token(binary(), fun(), ci | cs, binary()) -> any().
+token(<<>>, Fun, _Case, Acc) ->
+	Fun(<<>>, Acc);
+token(Data = << C, _Rest/binary >>, Fun, _Case, Acc)
+		when C =:= $(; C =:= $); C =:= $<; C =:= $>; C =:= $@;
+			 C =:= $,; C =:= $;; C =:= $:; C =:= $\\; C =:= $";
+			 C =:= $/; C =:= $[; C =:= $]; C =:= $?; C =:= $=;
+			 C =:= ${; C =:= $}; C =:= $\s; C =:= $\t;
+			 C < 32; C =:= 127 ->
+	Fun(Data, Acc);
+token(<< C, Rest/binary >>, Fun, Case = ci, Acc) ->
+	C2 = string:to_lower(C),
+	token(Rest, Fun, Case, << Acc/binary, C2 >>);
+token(<< C, Rest/binary >>, Fun, Case, Acc) ->
+	token(Rest, Fun, Case, << Acc/binary, C >>).
+
+
 request_headers(Req, State) ->
-    {Headers, Req1} = cowboy_req:header(<<"access-control-request-headers">>, Req, <<>>),
+    Headers = cowboy_req:header(<<"access-control-request-headers">>, Req, <<>>),
     case cowboy_http:list(Headers, fun cowboy_http:token_ci/2) of
         {error, badarg} ->
-            terminate(Req1, State);
+            terminate(Req, State);
         List ->
-            max_age(Req1, State#state{request_headers = List})
+            max_age(Req, State#state{request_headers = List})
     end.
 
 %% max_age/2 should return a non-negative integer or the atom undefined
@@ -193,18 +220,22 @@ call(Req, State = #state{policy = Policy, policy_state = PolicyState}, Callback,
     case erlang:function_exported(Policy, Callback, 2) of
         true ->
             try
-                Policy:Callback(Req, PolicyState)
-            catch Class:Reason ->
+                ct:pal("~p ~p:~p ~nReq: ~p ~n PolicyState: ~p", [?FUNCTION_NAME, Policy, Callback, Req, PolicyState]),
+                Res = Policy:Callback(Req, PolicyState),
+                ct:pal("~p ~p:~p success, res: ~p", [?FUNCTION_NAME, Policy, Callback, Res]),
+                Res
+            catch Class:Reason:Stacktrace ->
                     error_logger:error_msg(
                       "** Cowboy CORS policy ~p terminating in ~p/~p~n"
                       "   for the reason ~p:~p~n"
                       "** Request was ~p~n** Stacktrace: ~p~n~n",
                       [Policy, Callback, 2, Class, Reason,
-                       cowboy_req:to_list(Req), erlang:get_stacktrace()]),
+                       Req, Stacktrace]),
                     error_terminate(Req, State)
             end;
         false ->
-            {Default, Req, PolicyState}
+            ct:pal("Function ~p:~p is not exported", [Policy, Callback]),
+            {Default, PolicyState}
     end.
 
 terminate(Req, #state{preflight = true}) ->

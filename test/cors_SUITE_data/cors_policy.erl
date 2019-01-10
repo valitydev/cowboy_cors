@@ -14,10 +14,10 @@ policy_init(Req) ->
 
 allowed_origins(Req, State) ->
     case parse_list(<<"allowed_origins">>, Req) of
-        {[<<"*">>], Req1} ->
-            {'*', Req1, State};
-        {Allowed, Req1} ->
-            {Allowed, Req1, State}
+        [<<"*">>] ->
+            {'*', State};
+        Allowed ->
+            {Allowed, State}
     end.
 
 allow_credentials(Req, State) ->
@@ -41,13 +41,19 @@ max_age(Req, State) ->
     {MaxAge, Req1, State}.
 
 parse_list(Name, Req) ->
-    case cowboy_req:qs_val(Name, Req) of
-        {undefined, Req1} ->
-            {[], Req1};
-        {Bin, Req1} ->
-            List = binary:split(Bin, <<",">>, [global]),
-            {List, Req1}
-    end.
+    % case cowboy_req:qs_val(Name, Req) of
+    %     {undefined, Req1} ->
+    %         {[], Req1};
+    %     {Bin, Req1} ->
+    %         List = binary:split(Bin, <<",">>, [global]),
+    %         {List, Req1}
+    % end.
+    ct:log("~p", [Name]),
+    QSs = cowboy_req:parse_qs(Req),
+    ct:pal("Returned QSs: ~p", [QSs]),
+    QSs.
+
+
 
 parse_boolean(Name, Req, Default) ->
     case cowboy_req:qs_val(Name, Req) of
