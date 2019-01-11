@@ -21,24 +21,25 @@ allowed_origins(Req, State) ->
     end.
 
 allow_credentials(Req, State) ->
-    {IsAllowed, Req1} = parse_boolean(<<"allow_credentials">>, Req, false),
-    {IsAllowed, Req1, State}.
+    IsAllowed = parse_boolean(<<"allow_credentials">>, Req, false),
+    {IsAllowed, State}.
 
 exposed_headers(Req, State) ->
-    {Exposed, Req1} = parse_list(<<"exposed_headers">>, Req),
-    {Exposed, Req1, State}.
+    Exposed = parse_list(<<"exposed_headers">>, Req),
+    {Exposed, State}.
 
 allowed_headers(Req, State) ->
-    {Allowed, Req1} = parse_list(<<"allowed_headers">>, Req),
-    {Allowed, Req1, State}.
+    Allowed = parse_list(<<"allowed_headers">>, Req),
+    {Allowed, State}.
 
 allowed_methods(Req, State) ->
-    {Allowed, Req1} = parse_list(<<"allowed_methods">>, Req),
-    {Allowed, Req1, State}.
+    Allowed = parse_list(<<"allowed_methods">>, Req),
+    {Allowed, State}.
 
 max_age(Req, State) ->
-    {MaxAge, Req1} = parse_integer(<<"max_age">>, Req),
-    {MaxAge, Req1, State}.
+    ct:log("~p", [?FUNCTION_NAME]),
+    MaxAge = parse_integer(<<"max_age">>, Req),
+    {MaxAge, State}.
 
 parse_list(Name, Req) ->
     % case cowboy_req:qs_val(Name, Req) of
@@ -51,26 +52,53 @@ parse_list(Name, Req) ->
     ct:log("~p", [Name]),
     QSs = cowboy_req:parse_qs(Req),
     ct:pal("Returned QSs: ~p", [QSs]),
-    QSs.
-
-
+    Res = case lists:keyfind(Name, 1, QSs) of
+        false ->
+            [];
+        {Name, Value} ->
+           binary:split(Value, <<",">>, [global])
+    end,
+    ct:log("~p result: ~p", [?FUNCTION_NAME, Res]),
+    Res.
 
 parse_boolean(Name, Req, Default) ->
-    case cowboy_req:qs_val(Name, Req) of
-        {undefined, Req1} ->
-            {Default, Req1};
-        {<<"true">>, Req1} ->
-            {true, Req1};
-        {<<"false">>, Req1} ->
-            {false, Req1}
-    end.
+    % case cowboy_req:qs_val(Name, Req) of
+    %     {undefined, Req1} ->
+    %         {Default, Req1};
+    %     {<<"true">>, Req1} ->
+    %         {true, Req1};
+    %     {<<"false">>, Req1} ->
+    %         {false, Req1}
+    % end.
+    QSs = cowboy_req:parse_qs(Req),
+    Res = case lists:keyfind(Name, 1, QSs) of
+        false ->
+            Default;
+        {Name, <<"true">>} ->
+           true;
+        {Name, <<"false">>} ->
+            false
+    end,
+    ct:log("~p result: ~p", [?FUNCTION_NAME, Res]),
+    Res.
 
 parse_integer(Name, Req) ->
-    case cowboy_req:qs_val(Name, Req) of
-        {undefined, Req1} ->
-            {undefined, Req1};
-        {Bin, Req1} ->
-            String = binary_to_list(Bin),
+    % case cowboy_req:qs_val(Name, Req) of
+    %     {undefined, Req1} ->
+    %         {undefined, Req1};
+    %     {Bin, Req1} ->
+    %         String = binary_to_list(Bin),
+    %         {MaxAge, []} = string:to_integer(String),
+    %         {MaxAge, Req1}
+    % end.
+    QSs = cowboy_req:parse_qs(Req),
+    Res = case lists:keyfind(Name, 1, QSs) of
+        false ->
+            undefined;
+        {Name, Value} ->
+            String = binary_to_list(Value),
             {MaxAge, []} = string:to_integer(String),
-            {MaxAge, Req1}
-    end.
+            MaxAge
+    end,
+    ct:log("~p result: ~p", [?FUNCTION_NAME, Res]),
+    Res.
