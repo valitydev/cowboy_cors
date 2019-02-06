@@ -43,57 +43,62 @@
 
 all() ->
     [
-     {group, default},
-     {group, policy},
-     {group, cors_config_policy}
+        {group, default},
+        {group, policy},
+        {group, cors_config_policy}
     ].
 
 groups() ->
     [
-     {default, [parallel], [
-                            standard_no_origin_get,
-                            standard_no_origin_options,
-                            standard_get,
-                            standard_options
-                           ]},
-     {policy, [parallel], [
-                            standard_no_origin_get,
-                            standard_no_origin_options,
-                            standard_get,
-                            standard_options,
-                            simple_allowed_get,
-                            simple_wildcard_get,
-                            simple_allowed_credentials_get,
-                            simple_allowed_credentials_with_wildcard_origin,
-                            simple_exposed_headers,
-                            actual_options,
-                            preflight_method,
-                            preflight_allowed_method,
-                            preflight_credentials,
-                            preflight_wildcard_origin,
-                            preflight_credentials_with_wildcard_origin,
-                            preflight_header, % works
-                            preflight_allowed_header,
-                            preflight_allowed_header_webkit,
-                            preflight_max_age
-                            % preflight_invalid_max_age
-                          ]},
-     {cors_config_policy, [],
-      [
-       standard_no_origin_get,
-       standard_no_origin_options,
-       standard_get,
-       standard_options,
-       %% Origin whitelist
-       origin_whitelist_allowed_all,
-       origin_whitelist_unavail,
-       origin_whitelist_not_member,
-       credential_enabled,
-       request_headers_not_allowed,
-       request_methods_not_allowed,
-       exposed_headers_config,
-       max_age_enabled
-      ]}
+        {default, [parallel], 
+            [
+                standard_no_origin_get,
+                standard_no_origin_options,
+                standard_get,
+                standard_options
+            ]
+        },
+        {policy, [parallel], 
+            [
+                standard_no_origin_get,
+                standard_no_origin_options,
+                standard_get,
+                standard_options,
+                simple_allowed_get,
+                simple_wildcard_get,
+                simple_allowed_credentials_get,
+                simple_allowed_credentials_with_wildcard_origin,
+                simple_exposed_headers,
+                actual_options,
+                preflight_method,
+                preflight_allowed_method,
+                preflight_credentials,
+                preflight_wildcard_origin,
+                preflight_credentials_with_wildcard_origin,
+                preflight_header,
+                preflight_allowed_header,
+                preflight_allowed_header_webkit,
+                preflight_max_age
+                % preflight_invalid_max_age
+            ]
+        },
+        {cors_config_policy, [],
+            [
+                standard_no_origin_get,
+                standard_no_origin_options,
+                standard_get,
+                standard_options,
+                %% Origin whitelist
+                origin_whitelist_allowed_all,
+                origin_whitelist_unavail,
+                origin_whitelist_not_member,
+                credential_enabled,
+                request_headers_not_allowed,
+                request_methods_not_allowed,
+                exposed_headers_config,
+                max_age_enabled
+            ]
+        }
     ].
 
 init_per_suite(Config) ->
@@ -176,24 +181,15 @@ format_option(List) when is_list(List) ->
     <<",", Bin/binary>> = iolist_to_binary(IoList),
     Bin.
 
-% truncate_port(Url) ->
-%     {string:slice(Url, 0, string:length(Url) - 7), string:slice(Url, string:length(Url) - 6, 5)}.
-
 request(Method, Headers, Options, Config) ->
     Port = ?config(port, Config),
-    %{Url1, Port} = truncate_port(Url),
-    %{Port1, _} = string:to_integer(Port),
-    %Host = binary_to_list(Url1),
     Host = "localhost",
-    ct:log("Host: ~p:~p", [Host, Port]),
     {ok, PID} = gun:open(Host, Port),
     {ok, _} = gun:await_up(PID),
     RequestUrl = build_url(Host, Port, <<"/">>, Options),
-    ct:log("Sending request to ~p", [RequestUrl]),
     gun:request(PID, Method, RequestUrl, Headers, []),
     receive
         {gun_response, _, _, fin, Status, Resp} ->
-            ct:pal("Receiving response: ~p", [Resp]),
             {ok, Status, Resp, []};
         {'DOWN', _, process, _, Reason} ->
             error_logger:error_msg("Oops!"),
@@ -240,7 +236,6 @@ simple_allowed_get(Config) ->
                 [{allowed_origins, [<<"http://example.org">>, Origin]},
                  {allowed_methods, [<<"PUT">>, <<"GET">>]}],
                 Config),
-    ct:log("{_, ~p} == lists:keyfind(~p, ~p)", [Origin, <<"access-control-allow-origin">>, Headers]),
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers).
 

@@ -24,14 +24,12 @@
 
 %% @private
 execute(Req, Env) ->
-    ct:log("execute"),
     Policy = maps:get(cors_policy, Env),
     Method = cowboy_req:method(Req),
     origin_present(Req, #state{env = Env, policy = Policy, method = Method}).
 
 %% CORS specification only applies to requests with an `Origin' header.
 origin_present(Req, State) ->
-    ct:log("Origin present"),
     case cowboy_req:header(<<"origin">>, Req) of
         undefined ->
             terminate(Req, State);
@@ -42,10 +40,7 @@ origin_present(Req, State) ->
 policy_init(Req, State = #state{policy = Policy}) ->
     try Policy:policy_init(Req) of
         {ok, Req1, PolicyState} ->
-            ct:pal("~p, trying to call ~p:policy_init", [?FUNCTION_NAME, Policy]),
-            Res = allowed_origins(Req1, State#state{policy_state = PolicyState}),
-            ct:pal("called policy_init successfuly"),
-            Res
+            allowed_origins(Req1, State#state{policy_state = PolicyState})
     catch Class:Reason:Stacktrace ->
                 error_logger:error_msg(
                   "** Cowboy CORS policy ~p terminating in ~p/~p~n"
@@ -62,13 +57,10 @@ allowed_origins(Req, State = #state{origin = Origin}) ->
         {'*', PolicyState} ->
             request_method(Req, State#state{policy_state = PolicyState});
         {List, PolicyState} ->
-            ct:pal("Calling lists:member(~p, ~p)", [Origin, List]),
             case lists:member(Origin, List) of
                 true ->
-                    ct:pal("Origin is here"),
                     request_method(Req, State#state{policy_state = PolicyState});
                 false ->
-                    ct:pal("No origin here, calling terminate"),
                     terminate(Req, State#state{policy_state = PolicyState})
             end
     end.
@@ -79,7 +71,6 @@ request_method(Req, State = #state{method = <<"OPTIONS">>}) ->
             %% This is not a pre-flight request, but an actual request.
             exposed_headers(Req, State);
         Data ->
-            ct:pal("~p Data", [?FUNCTION_NAME]),
             cowboy_cors_lib:token(Data,
                               fun(<<>>, Method) ->
                                       request_headers(Req, State#state{preflight = true,
@@ -93,7 +84,6 @@ request_method(Req, State) ->
 
 request_headers(Req, State) ->
     Headers = cowboy_req:header(<<"access-control-request-headers">>, Req, <<>>),
-    ct:pal("~p", [?FUNCTION_NAME]),
     case cowboy_cors_lib:list(Headers, fun cowboy_cors_lib:token_ci/2) of
         {error, badarg} ->
             terminate(Req, State);
@@ -192,13 +182,10 @@ if_not_allow_credentials(Req, State = #state{origin = Origin}) ->
     terminate(Req2, State).
 
 expect(Req, State, Callback, Expected, OnTrue, OnFalse) ->
-    ct:pal("~p", [?FUNCTION_NAME]),
     case call(Req, State, Callback, Expected) of
         {Expected, PolicyState} ->
-            ct:pal("got Expected: ~p", [Expected]),
             OnTrue(Req, State#state{policy_state = PolicyState});
         {_Unexpected, PolicyState} ->
-            ct:pal("Unexpected, expected: ~p, got: ~p", [Expected, _Unexpected]),
             OnFalse(Req, State#state{policy_state = PolicyState})
     end.
 
@@ -206,10 +193,7 @@ call(Req, State = #state{policy = Policy, policy_state = PolicyState}, Callback,
     case erlang:function_exported(Policy, Callback, 2) of
         true ->
             try
-                ct:pal("~p ~p:~p ~nReq: ~p ~n PolicyState: ~p", [?FUNCTION_NAME, Policy, Callback, Req, PolicyState]),
-                Res = Policy:Callback(Req, PolicyState),
-                ct:pal("~p ~p:~p success, res: ~p", [?FUNCTION_NAME, Policy, Callback, Res]),
-                Res
+                Policy:Callback(Req, PolicyState)
             catch Class:Reason:Stacktrace ->
                     error_logger:error_msg(
                       "** Cowboy CORS policy ~p terminating in ~p/~p~n"
@@ -220,16 +204,13 @@ call(Req, State = #state{policy = Policy, policy_state = PolicyState}, Callback,
                     error_terminate(Req, State)
             end;
         false ->
-            ct:pal("Function ~p:~p is not exported", [Policy, Callback]),
             {Default, PolicyState}
     end.
 
 terminate(Req, #state{preflight = true}) ->
-    ct:log("Terminated with stop"),
     cowboy_req:reply(204, cowboy_req:headers(Req), [], Req),
     {stop, Req};
 terminate(Req, #state{env = Env}) ->
-    ct:log("Terminated without stop"),
     {ok, Req, Env}.
 
 -spec error_terminate(cowboy_req:req(), #state{}) -> no_return().

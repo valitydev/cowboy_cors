@@ -1,4 +1,5 @@
 /deps
+_build/
 /.eunit
 ebin/*
 logs/*
