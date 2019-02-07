@@ -206,7 +206,7 @@ get_all_env() ->
 
 set_all_env(Params) ->
     lists:foreach(fun({Key, Value}) ->
-                          application:set_env(cowboy_cors, Key, Value)
+                        application:set_env(cowboy_cors, Key, Value)
                   end, Params).
 %% Tests
 

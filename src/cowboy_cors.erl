@@ -43,13 +43,13 @@ policy_init(Req, State = #state{policy = Policy}) ->
         {ok, Req1, PolicyState} ->
             allowed_origins(Req1, State#state{policy_state = PolicyState})
     catch Class:Reason:Stacktrace ->
-                error_logger:error_msg(
-                  "** Cowboy CORS policy ~p terminating in ~p/~p~n"
-                  "   for the reason ~p:~p~n"
-                  "** Request was ~p~n** Stacktrace: ~p~n~n",
-                  [Policy, policy_init, 1, Class, Reason,
-                   Req, Stacktrace]),
-            error_terminate(Req, State)
+        error_logger:error_msg(
+            "** Cowboy CORS policy ~p terminating in ~p/~p~n"
+            "   for the reason ~p:~p~n"
+            "** Request was ~p~n** Stacktrace: ~p~n~n",
+            [Policy, policy_init, 1, Class, Reason, Req, Stacktrace]
+        ),
+        error_terminate(Req, State)
     end.
 
 %% allowed_origins/2 should return a list of origins or the atom '*'
@@ -72,20 +72,21 @@ request_method(Req, State = #state{method = <<"OPTIONS">>}) ->
             %% This is not a pre-flight request, but an actual request.
             exposed_headers(Req, State);
         Data ->
-            cowboy_cors_utils:token(Data,
-                              fun(<<>>, Method) ->
-                                      request_headers(Req, State#state{preflight = true,
-                                                                        request_method = Method});
-                                 (_, _) ->
-                                      terminate(Req, State)
-                              end)
+            cowboy_cors_utils:token(
+                Data,
+                fun (<<>>, Method) ->
+                        request_headers(Req, State#state{preflight = true, request_method = Method});
+                    (_, _) ->
+                        terminate(Req, State)
+                end
+            )
     end;
 request_method(Req, State) ->
     exposed_headers(Req, State).
 
 request_headers(Req, State) ->
-    Headers = cowboy_req:header(<<"access-control-request-headers">>, Req, <<>>),
-    case cowboy_cors_utils:list(Headers, fun cowboy_cors_utils:token_ci/2) of
+    Header = cowboy_req:header(<<"access-control-request-headers">>, Req, <<>>),
+    case cowboy_cors_utils:list(Header, fun cowboy_cors_utils:token_ci/2) of
         {error, badarg} ->
             terminate(Req, State);
         List ->
@@ -95,8 +96,7 @@ request_headers(Req, State) ->
 %% max_age/2 should return a non-negative integer or the atom undefined
 max_age(Req, State) ->
     case call(Req, State, max_age, undefined) of
-        {MaxAge, PolicyState}
-          when is_integer(MaxAge) andalso MaxAge >= 0 ->
+        {MaxAge, PolicyState} when is_integer(MaxAge) andalso MaxAge >= 0 ->
             MaxAgeBin = list_to_binary(integer_to_list(MaxAge)),
             Req1 = cowboy_req:set_resp_header(<<"access-control-max-age">>, MaxAgeBin, Req),
             allowed_methods(Req1, State#state{policy_state = PolicyState});
@@ -144,8 +144,8 @@ set_allow_headers(Req, State) ->
     case cowboy_req:header(<<"access-control-request-headers">>, Req) of
         undefined ->
             allow_credentials(Req, State);
-        Headers ->
-            Req1 = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, Headers, Req),
+        Header ->
+            Req1 = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, Header, Req),
             allow_credentials(Req1, State)
     end.
 
@@ -164,7 +164,7 @@ set_exposed_headers(Req, Headers) ->
 %% allow_credentials/1 should return true or false.
 allow_credentials(Req, State) ->
     expect(Req, State, allow_credentials, false,
-           fun if_not_allow_credentials/2, fun if_allow_credentials/2).
+        fun if_not_allow_credentials/2, fun if_allow_credentials/2).
 
 %% If credentials are allowed, then the value of
 %% `Access-Control-Allow-Origin' is limited to the requesting origin.
@@ -196,13 +196,13 @@ call(Req, State = #state{policy = Policy, policy_state = PolicyState}, Callback,
             try
                 Policy:Callback(Req, PolicyState)
             catch Class:Reason:Stacktrace ->
-                    error_logger:error_msg(
-                      "** Cowboy CORS policy ~p terminating in ~p/~p~n"
-                      "   for the reason ~p:~p~n"
-                      "** Request was ~p~n** Stacktrace: ~p~n~n",
-                      [Policy, Callback, 2, Class, Reason,
-                       Req, Stacktrace]),
-                    error_terminate(Req, State)
+                error_logger:error_msg(
+                    "** Cowboy CORS policy ~p terminating in ~p/~p~n"
+                    "   for the reason ~p:~p~n"
+                    "** Request was ~p~n** Stacktrace: ~p~n~n",
+                    [Policy, Callback, 2, Class, Reason, Req, Stacktrace]
+                ),
+                error_terminate(Req, State)
             end;
         false ->
             {Default, PolicyState}

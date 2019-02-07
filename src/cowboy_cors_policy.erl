@@ -15,9 +15,7 @@
 -type state() :: any().
 -type req()   :: cowboy_req:req().
 
--callback policy_init(Req)
-        -> {ok, Req, state()}
-        when Req :: cowboy_req:req().
+-callback policy_init(Req) -> {ok, Req, state()} when Req :: cowboy_req:req().
 
 
 -spec policy_init(req()) -> {ok, req(), state()}.
@@ -59,8 +57,7 @@ allowed_methods(_, State) ->
     AllowedMethods = application:get_env(cowboy_cors, allowed_methods, []),
     {AllowedMethods, State}.
 
--spec max_age(req(), state()) ->
-                     {non_neg_integer() | undefined, req(), state()}.
+-spec max_age(req(), state()) -> {non_neg_integer() | undefined, req(), state()}.
 max_age(_, State) ->
     MaxAgeSecs = application:get_env(cowboy_cors, max_age, undefined),
     {MaxAgeSecs, State}.
