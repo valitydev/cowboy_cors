@@ -1,8 +1,9 @@
--module(cowboy_cors_lib).
+-module(cowboy_cors_utils).
 
-% This module constains copy-pasted functions, that went missing from cowboy since 0.8.6
+% This module  mostly constains copy-pasted functions, that went missing from cowboy since 0.8.6
 % version, yet still used in this app.
 
+-export([format_methods/1]).
 -export([nonempty_list/2]).
 -export([list/2]).
 -export([token_ci/2]).
@@ -67,3 +68,15 @@ token(<< C, Rest/binary >>, Fun, Case = ci, Acc) ->
 	token(Rest, Fun, Case, << Acc/binary, C2 >>);
 token(<< C, Rest/binary >>, Fun, Case, Acc) ->
 	token(Rest, Fun, Case, << Acc/binary, C >>).
+
+-spec format_methods([binary()]) -> binary().
+
+format_methods(Methods) ->
+   format_methods(Methods, <<>>).
+
+format_methods([], Rest) ->
+    Rest;
+format_methods([Head | [] = Tail], Rest) ->
+    format_methods(Tail, <<Rest/binary, Head/binary>>);
+format_methods([Head | Tail], Rest) ->
+    format_methods(Tail, <<Rest/binary, Head/binary, <<", ">>/binary>>).

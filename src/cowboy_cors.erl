@@ -16,6 +16,7 @@
           request_method       :: binary(),
           request_headers = [] :: [binary()],
           preflight = false    :: boolean(),
+          allowed_methods = [] :: [binary()],
 
           %% Policy handler.
           policy               :: atom(),
@@ -71,7 +72,7 @@ request_method(Req, State = #state{method = <<"OPTIONS">>}) ->
             %% This is not a pre-flight request, but an actual request.
             exposed_headers(Req, State);
         Data ->
-            cowboy_cors_lib:token(Data,
+            cowboy_cors_utils:token(Data,
                               fun(<<>>, Method) ->
                                       request_headers(Req, State#state{preflight = true,
                                                                         request_method = Method});
@@ -84,7 +85,7 @@ request_method(Req, State) ->
 
 request_headers(Req, State) ->
     Headers = cowboy_req:header(<<"access-control-request-headers">>, Req, <<>>),
-    case cowboy_cors_lib:list(Headers, fun cowboy_cors_lib:token_ci/2) of
+    case cowboy_cors_utils:list(Headers, fun cowboy_cors_utils:token_ci/2) of
         {error, badarg} ->
             terminate(Req, State);
         List ->
@@ -110,7 +111,7 @@ allowed_methods(Req, State = #state{request_method = Method}) ->
         false ->
             terminate(Req, State#state{policy_state = PolicyState});
         true ->
-            allowed_headers(Req, State#state{policy_state = PolicyState})
+            allowed_headers(Req, State#state{policy_state = PolicyState, allowed_methods = List})
     end.
 
 allowed_headers(Req, State = #state{request_headers = Requested}) ->
@@ -133,8 +134,8 @@ check_allowed_headers([Header|Tail], Allowed, Req, State) ->
             check_allowed_headers(Tail, Allowed, Req, State)
     end.
 
-set_allow_methods(Req, State = #state{request_method = Method}) ->
-    Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, Method, Req),
+set_allow_methods(Req, State = #state{allowed_methods = Methods}) ->
+    Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, cowboy_cors_utils:format_methods(Methods), Req),
     set_allow_headers(Req1, State).
 
 set_allow_headers(Req, State) ->
