@@ -209,8 +209,8 @@ call(Req, State = #state{policy = Policy, policy_state = PolicyState}, Callback,
     end.
 
 terminate(Req, #state{preflight = true}) ->
-    cowboy_req:reply(204, cowboy_req:headers(Req), [], Req),
-    {stop, Req};
+    Req1 = cowboy_req:reply(200, cowboy_req:headers(Req), [], Req),
+    {stop, Req1};
 terminate(Req, #state{env = Env}) ->
     {ok, Req, Env}.
 

@@ -30,7 +30,7 @@
 -export([preflight_allowed_header/1]).
 -export([preflight_allowed_header_webkit/1]).
 -export([preflight_max_age/1]).
-%-export([preflight_invalid_max_age/1]).
+-export([preflight_invalid_max_age/1]).
 %% Config cors policy
 -export([origin_whitelist_allowed_all/1]).
 -export([origin_whitelist_unavail/1]).
@@ -78,8 +78,8 @@ groups() ->
                 preflight_header,
                 preflight_allowed_header,
                 preflight_allowed_header_webkit,
-                preflight_max_age
-                % preflight_invalid_max_age
+                preflight_max_age,
+                preflight_invalid_max_age
             ]
         },
         {cors_config_policy, [],
@@ -211,26 +211,26 @@ set_all_env(Params) ->
 %% Tests
 
 standard_no_origin_get(Config) ->
-    {ok, 204, Headers} = request(<<"GET">>, [], Config),
+    {ok, 200, Headers} = request(<<"GET">>, [], Config),
     false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
 
 standard_no_origin_options(Config) ->
-    {ok, 204, Headers} = request(<<"OPTIONS">>, [], Config),
+    {ok, 200, Headers} = request(<<"OPTIONS">>, [], Config),
     false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
 
 standard_get(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} = request(<<"GET">>, [{<<"Origin">>, Origin}], Config),
+    {ok, 200, Headers} = request(<<"GET">>, [{<<"Origin">>, Origin}], Config),
     false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
 
 standard_options(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} = request(<<"OPTIONS">>, [{<<"Origin">>, Origin}], Config),
+    {ok, 200, Headers} = request(<<"OPTIONS">>, [{<<"Origin">>, Origin}], Config),
     false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
 
 simple_allowed_get(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"GET">>,
                 [{<<"Origin">>, Origin}],
                 [{allowed_origins, [<<"http://example.org">>, Origin]},
@@ -241,7 +241,7 @@ simple_allowed_get(Config) ->
 
 simple_wildcard_get(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"GET">>,
                 [{<<"Origin">>, Origin}],
                 [{allowed_origins, "*"}],
@@ -251,7 +251,7 @@ simple_wildcard_get(Config) ->
 
 simple_allowed_credentials_get(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"GET">>,
                 [{<<"Origin">>, Origin}],
                 [{allowed_origins, Origin},
@@ -262,7 +262,7 @@ simple_allowed_credentials_get(Config) ->
 
 simple_allowed_credentials_with_wildcard_origin(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"GET">>,
                 [{<<"Origin">>, Origin}],
                 [{allowed_origins, "*"},
@@ -275,7 +275,7 @@ simple_allowed_credentials_with_wildcard_origin(Config) ->
 simple_exposed_headers(Config) ->
     Origin = <<"http://example.com">>,
     Exposed = [<<"x-first">>, <<"x-second">>],
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"GET">>,
                 [{<<"Origin">>, Origin}],
                 [{allowed_origins, Origin},
@@ -290,7 +290,7 @@ simple_exposed_headers(Config) ->
 actual_options(Config) ->
     %% OPTIONS request without Access-Control-Request-Method is not a pre-flight request.
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin}],
                 [{allowed_origins, Origin}],
@@ -301,7 +301,7 @@ actual_options(Config) ->
 
 preflight_method(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"DELETE">>}],
@@ -316,7 +316,7 @@ preflight_method(Config) ->
 
 preflight_allowed_method(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>}],
@@ -334,7 +334,7 @@ preflight_allowed_method(Config) ->
 
 preflight_credentials(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>}],
@@ -351,7 +351,7 @@ preflight_credentials(Config) ->
 
 preflight_wildcard_origin(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>}],
@@ -368,7 +368,7 @@ preflight_wildcard_origin(Config) ->
 
 preflight_credentials_with_wildcard_origin(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>}],
@@ -386,7 +386,7 @@ preflight_credentials_with_wildcard_origin(Config) ->
 
 preflight_header(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -405,7 +405,7 @@ preflight_header(Config) ->
 
 preflight_allowed_header(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -425,7 +425,7 @@ preflight_allowed_header(Config) ->
 %% Test for Webkit browsers requesting 'Origin' header.
 preflight_allowed_header_webkit(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -444,7 +444,7 @@ preflight_allowed_header_webkit(Config) ->
 
 preflight_max_age(Config) ->
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>}],
@@ -455,20 +455,18 @@ preflight_max_age(Config) ->
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, <<"30">>} = lists:keyfind(<<"access-control-max-age">>, 1, Headers).
 
-% we can no longer receive {error, Reason}, so I'm unsure if we want to pattern match on 500 error
-% or we can just exlucde this from testing
 % if max age is negative, middleware IS TO FAIL
 
-% preflight_invalid_max_age(Config) ->
-%     Origin = <<"http://example.com">>,
-%     {error, closed} =
-%         request(<<"OPTIONS">>,
-%                 [{<<"Origin">>, Origin},
-%                  {<<"Access-Control-Request-Method">>, <<"PUT">>}],
-%                 [{allowed_origins, Origin},
-%                  {allowed_methods, <<"PUT">>},
-%                  {max_age, -30}],
-%                 Config).
+preflight_invalid_max_age(Config) ->
+    Origin = <<"http://example.com">>,
+    {ok, 500, _} =
+        request(<<"OPTIONS">>,
+                [{<<"Origin">>, Origin},
+                 {<<"Access-Control-Request-Method">>, <<"PUT">>}],
+                [{allowed_origins, Origin},
+                 {allowed_methods, <<"PUT">>},
+                 {max_age, -30}],
+                Config).
 
 %% Test for configuration cors policy
 origin_whitelist_allowed_all(Config) ->
@@ -480,7 +478,7 @@ origin_whitelist_allowed_all(Config) ->
     ok = application:set_env(cowboy_cors, allowed_headers, [<<"x-requested">>]),
     ok = application:set_env(cowboy_cors, allowed_credential, false),
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -505,7 +503,7 @@ origin_whitelist_unavail(Config) ->
     ok = application:set_env(cowboy_cors, allowed_methods, [<<"PUT">>]),
     ok = application:set_env(cowboy_cors, allowed_headers, [<<"x-requested">>]),
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -525,7 +523,7 @@ origin_whitelist_not_member(Config) ->
     ok = application:set_env(cowboy_cors, allowed_methods, [<<"PUT">>]),
     ok = application:set_env(cowboy_cors, allowed_headers, [<<"x-requested">>]),
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -547,7 +545,7 @@ credential_enabled(Config) ->
     ok = application:set_env(cowboy_cors, allowed_headers, [<<"x-requested">>]),
     ok = application:set_env(cowboy_cors, allowed_credential, true),
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -569,7 +567,7 @@ request_headers_not_allowed(Config) ->
     ok = application:set_env(cowboy_cors, allowed_methods, [<<"PUT">>]),
     ok = application:set_env(cowboy_cors, allowed_headers, [<<"authorization">>]),
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
@@ -590,7 +588,7 @@ request_methods_not_allowed(Config) ->
     ok = application:set_env(cowboy_cors, allowed_methods, [<<"PUT">>]),
     ok = application:set_env(cowboy_cors, allowed_headers, [<<"x-requested">>]),
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"GET">>},
@@ -612,7 +610,7 @@ exposed_headers_config(Config) ->
     ok = application:set_env(cowboy_cors, allowed_methods, [<<"PUT">>]),
     ok = application:set_env(cowboy_cors, exposed_headers, Exposed),
 
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"GET">>,
                 [{<<"Origin">>, Origin}],
                 [{allowed_origins, Origin},
@@ -635,7 +633,7 @@ max_age_enabled(Config) ->
     ok = application:set_env(cowboy_cors, allowed_headers, [<<"x-requested">>]),
     ok = application:set_env(cowboy_cors, max_age, 30),
     Origin = <<"http://example.com">>,
-    {ok, 204, Headers} =
+    {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
                  {<<"Access-Control-Request-Method">>, <<"PUT">>},
