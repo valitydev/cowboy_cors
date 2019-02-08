@@ -139,15 +139,8 @@ set_allow_methods(Req, State = #state{allowed_methods = Methods}) ->
     Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, header_list(Methods), Req),
     set_allow_headers(Req1, State).
 
--dialyzer({nowarn_function, set_allow_headers/2}).
-
 set_allow_headers(Req0, State = #state{allowed_headers = Allowed}) ->
-    Req = case Allowed of
-        [] ->
-            Req0;
-        _ ->
-            cowboy_req:set_resp_header(<<"access-control-allow-headers">>, header_list(Allowed), Req0)
-    end,
+    Req = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, header_list(Allowed), Req0),
     allow_credentials(Req, State).
 
 
@@ -224,6 +217,8 @@ error_terminate(_Req, _State) ->
 header_list(Values) ->
     header_list(Values, <<>>).
 
+header_list([], Acc) ->
+    Acc;
 header_list([Value], Acc) ->
     <<Acc/binary, Value/binary>>;
 header_list([Value | Rest], Acc) ->

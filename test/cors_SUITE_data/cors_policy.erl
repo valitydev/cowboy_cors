@@ -48,13 +48,6 @@ parse_list(Name, Req) ->
         _ ->
             binary:split(Value, <<",">>, [global])
     end.
-    % QSs = cowboy_req:parse_qs(Req),
-    % case lists:keyfind(Name, 1, QSs) of
-    %     false ->
-    %         [];
-    %     {Name, Value} ->
-    %        binary:split(Value, <<",">>, [global])
-    % end.
 
 parse_boolean(Name, Req, Default) ->
     #{Name := Value} = cowboy_req:match_qs([{Name, [], undefined}], Req),
