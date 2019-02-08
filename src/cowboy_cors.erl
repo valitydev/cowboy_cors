@@ -135,7 +135,7 @@ check_allowed_headers([Header|Tail], Allowed, Req, State) ->
     end.
 
 set_allow_methods(Req, State = #state{allowed_methods = Methods}) ->
-    Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, cowboy_cors_utils:format_methods(Methods), Req),
+    Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, header_list(Methods), Req),
     set_allow_headers(Req1, State).
 
 set_allow_headers(Req, State) ->

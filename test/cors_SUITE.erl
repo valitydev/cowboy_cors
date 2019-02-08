@@ -325,7 +325,7 @@ preflight_allowed_method(Config) ->
                 Config),
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, Allowed} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    true  = lists:member(<<"GET">>, binary:split(Allowed, <<", ">>)), % maybe it's a little complicated
+    true  = lists:member(<<"GET">>, binary:split(Allowed, <<",">>)),
     false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
     false = lists:keyfind(<<"access-control-max-age">>, 1, Headers),
