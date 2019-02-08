@@ -88,7 +88,7 @@ groups() ->
                 standard_no_origin_options,
                 standard_get,
                 standard_options,
-                %% Origin whitelist
+                % Origin whitelist
                 origin_whitelist_allowed_all,
                 origin_whitelist_unavail,
                 origin_whitelist_not_member,
@@ -416,7 +416,8 @@ preflight_allowed_header(Config) ->
                 Config),
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, <<"X-Requested">>} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
     false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
     %% Pre-flight requests should not be completed by the handler.
@@ -436,7 +437,8 @@ preflight_allowed_header_webkit(Config) ->
                 Config),
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, <<"origin, x-requested">>} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
     false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
     %% Pre-flight requests should not be completed by the handler.
@@ -487,7 +489,8 @@ origin_whitelist_allowed_all(Config) ->
                 Config),
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, <<"X-Requested">>} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
     false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
     %% Pre-flight requests should not be completed by the handler.
@@ -554,9 +557,9 @@ credential_enabled(Config) ->
                 Config),
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, <<"X-Requested">>} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
-    {_, <<"true">>} = lists:keyfind(<<"access-control-allow-credentials">>, 1,
-                                    Headers),
+    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
+    {_, <<"true">>} = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -620,7 +623,6 @@ exposed_headers_config(Config) ->
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, ExposedList} = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
     Exposed = cowboy_cors_utils:nonempty_list(ExposedList, fun cowboy_cors_utils:token/2),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     %% Postconfig
     set_all_env(OrigEnv).
 

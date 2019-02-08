@@ -14,9 +14,10 @@
           method                 :: binary(),
           origin = <<>>          :: binary(),
           request_method  = <<>> :: binary(),
-          request_headers = []   :: [binary()],
+          request_headers = []   :: [binary()], 
           preflight = false      :: boolean(),
           allowed_methods = []   :: [binary()],
+          allowed_headers = [<<"origin">>]   :: [binary()],
 
           %% Policy handler.
           policy               :: atom(),
@@ -114,40 +115,41 @@ allowed_methods(Req, State = #state{request_method = Method}) ->
             allowed_headers(Req, State#state{policy_state = PolicyState, allowed_methods = List})
     end.
 
-allowed_headers(Req, State = #state{request_headers = Requested}) ->
+allowed_headers(Req, State = #state{request_headers = Requested, allowed_headers = Allowed}) ->
     {List, PolicyState} = call(Req, State, allowed_headers, []),
-    check_allowed_headers(Requested, List, Req, State#state{policy_state = PolicyState}).
+    check_allowed_headers(Requested, Req, State#state{policy_state = PolicyState, allowed_headers = Allowed ++ List}).
 
-check_allowed_headers([], _, Req, State) ->
+check_allowed_headers([], Req, State) ->
     set_allow_methods(Req, State);
-check_allowed_headers([<<"origin">>|Tail], Allowed, Req, State) ->
+check_allowed_headers([<<"origin">>|Tail], Req, State) ->
     %% KLUDGE: for browsers that include this header, but don't
     %% actually check it (i.e. Webkit).  Given that the 'Origin'
     %% header underpins the entire CORS framework, its inclusion in
     %% the requested headers is nonsensical.
-    check_allowed_headers(Tail, Allowed, Req, State);
-check_allowed_headers([Header|Tail], Allowed, Req, State) ->
+    check_allowed_headers(Tail, Req, State);
+check_allowed_headers([Header|Tail], Req, State = #state{allowed_headers = Allowed}) ->
     case lists:member(Header, Allowed) of
         false ->
             terminate(Req, State);
         true ->
-            check_allowed_headers(Tail, Allowed, Req, State)
+            check_allowed_headers(Tail, Req, State)
     end.
 
 set_allow_methods(Req, State = #state{allowed_methods = Methods}) ->
     Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, header_list(Methods), Req),
     set_allow_headers(Req1, State).
 
-set_allow_headers(Req, State) ->
-    %% Since we have already validated the requested headers, we can
-    %% simply reflect the list back to the client.
-    case cowboy_req:header(<<"access-control-request-headers">>, Req) of
-        undefined ->
-            allow_credentials(Req, State);
-        Header ->
-            Req1 = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, Header, Req),
-            allow_credentials(Req1, State)
-    end.
+-dialyzer({nowarn_function, set_allow_headers/2}).
+
+set_allow_headers(Req0, State = #state{allowed_headers = Allowed}) ->
+    Req = case Allowed of
+        [] ->
+            Req0;
+        _ ->
+            cowboy_req:set_resp_header(<<"access-control-allow-headers">>, header_list(Allowed), Req0)
+    end,
+    allow_credentials(Req, State).
+
 
 %% exposed_headers/2 should return a list of binary header names.
 exposed_headers(Req, State) ->
