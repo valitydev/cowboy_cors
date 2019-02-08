@@ -10,13 +10,13 @@
 -export([execute/2]).
 
 -record(state, {
-          env                  :: cowboy_middleware:env(),
-          method               :: binary(),
-          origin               :: binary(),
-          request_method       :: binary(),
-          request_headers = [] :: [binary()],
-          preflight = false    :: boolean(),
-          allowed_methods = [] :: [binary()],
+          env                    :: cowboy_middleware:env(),
+          method                 :: binary(),
+          origin = <<>>          :: binary(),
+          request_method  = <<>> :: binary(),
+          request_headers = []   :: [binary()],
+          preflight = false      :: boolean(),
+          allowed_methods = []   :: [binary()],
 
           %% Policy handler.
           policy               :: atom(),

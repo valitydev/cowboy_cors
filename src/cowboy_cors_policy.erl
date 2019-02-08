@@ -17,6 +17,14 @@
 
 -callback policy_init(Req) -> {ok, Req, state()} when Req :: cowboy_req:req().
 
+-dialyzer({nowarn_function, [
+    allowed_origins/2,
+    exposed_headers/2,
+    allowed_headers/2,
+    allow_credentials/2,
+    allowed_methods/2,
+    max_age/2
+]}).
 
 -spec policy_init(req()) -> {ok, req(), state()}.
 policy_init(Req) ->
