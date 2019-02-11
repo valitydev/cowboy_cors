@@ -14,10 +14,10 @@
           method                 :: binary(),
           origin = <<>>          :: binary(),
           request_method  = <<>> :: binary(),
-          request_headers = []   :: [binary()], 
           preflight = false      :: boolean(),
           allowed_methods = []   :: [binary()],
           allowed_headers = [<<"origin">>]   :: [binary()],
+          request_headers_present = true :: boolean(), 
 
           %% Policy handler.
           policy               :: atom(),
@@ -86,13 +86,13 @@ request_method(Req, State) ->
     exposed_headers(Req, State).
 
 request_headers(Req, State) ->
-    Header = cowboy_req:header(<<"access-control-request-headers">>, Req, <<>>),
-    case cowboy_cors_utils:list(Header, fun cowboy_cors_utils:token_ci/2) of
-        {error, badarg} ->
-            terminate(Req, State);
-        List ->
-            max_age(Req, State#state{request_headers = List})
-    end.
+    ReqHeadersPresent = case cowboy_req:header(<<"access-control-request-headers">>, Req, undefined) of
+        undefined ->
+            false;
+        _ ->
+            true
+    end,
+    max_age(Req, State#state{request_headers_present = ReqHeadersPresent}).
 
 %% max_age/2 should return a non-negative integer or the atom undefined
 max_age(Req, State) ->
@@ -115,32 +115,23 @@ allowed_methods(Req, State = #state{request_method = Method}) ->
             allowed_headers(Req, State#state{policy_state = PolicyState, allowed_methods = List})
     end.
 
-allowed_headers(Req, State = #state{request_headers = Requested, allowed_headers = Allowed}) ->
+% Seems like we don't need to validate headers anymore
+allowed_headers(Req, State = #state{allowed_headers = Allowed}) ->
     {List, PolicyState} = call(Req, State, allowed_headers, []),
-    check_allowed_headers(Requested, Req, State#state{policy_state = PolicyState, allowed_headers = Allowed ++ List}).
-
-check_allowed_headers([], Req, State) ->
-    set_allow_methods(Req, State);
-check_allowed_headers([<<"origin">>|Tail], Req, State) ->
-    %% KLUDGE: for browsers that include this header, but don't
-    %% actually check it (i.e. Webkit).  Given that the 'Origin'
-    %% header underpins the entire CORS framework, its inclusion in
-    %% the requested headers is nonsensical.
-    check_allowed_headers(Tail, Req, State);
-check_allowed_headers([Header|Tail], Req, State = #state{allowed_headers = Allowed}) ->
-    case lists:member(Header, Allowed) of
-        false ->
-            terminate(Req, State);
-        true ->
-            check_allowed_headers(Tail, Req, State)
-    end.
+    set_allow_methods(Req, State#state{policy_state = PolicyState, allowed_headers = Allowed ++ List}).
 
 set_allow_methods(Req, State = #state{allowed_methods = Methods}) ->
     Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, header_list(Methods), Req),
     set_allow_headers(Req1, State).
 
-set_allow_headers(Req0, State = #state{allowed_headers = Allowed}) ->
-    Req = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, header_list(Allowed), Req0),
+set_allow_headers(Req0, State = #state{allowed_headers = Allowed, request_headers_present = ReqHeadersPresent}) ->
+    Headers = case ReqHeadersPresent of
+        true ->
+            header_list(Allowed);
+        false ->
+            <<>>
+    end,
+    Req = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, Headers, Req0),
     allow_credentials(Req, State).
 
 

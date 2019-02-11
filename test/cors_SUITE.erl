@@ -386,6 +386,7 @@ preflight_credentials_with_wildcard_origin(Config) ->
 
 preflight_header(Config) ->
     Origin = <<"http://example.com">>,
+    AllowedHeaders = [<<"x-unused">>, <<"x-also-unused">>],
     {ok, 200, Headers} =
         request(<<"OPTIONS">>,
                 [{<<"Origin">>, Origin},
@@ -393,11 +394,12 @@ preflight_header(Config) ->
                  {<<"Access-Control-Request-Headers">>, <<"X-Custom">>}],
                 [{allowed_origins, Origin},
                  {allowed_methods, <<"PUT">>},
-                 {allowed_headers, [<<"x-unused">>, <<"x-also-unused">>]}],
+                 {allowed_headers, AllowedHeaders}],
                 Config),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
+    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
+    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    [] = AllowedHeaders -- binary:split(Allowed, <<",">>, [global]), % return contains all AllowedHeaders
     false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
     %% Pre-flight requests should not be completed by the handler.
@@ -577,9 +579,10 @@ request_headers_not_allowed(Config) ->
                  {<<"Access-Control-Request-Headers">>, <<"X-Requested">>}],
                 [],
                 Config),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
+    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
+    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    true = lists:member(<<"authorization">>, binary:split(Allowed, <<",">>, [global])),
     %% Postconfig
     set_all_env(OrigEnv).
 
