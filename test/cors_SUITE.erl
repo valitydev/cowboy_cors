@@ -624,6 +624,7 @@ exposed_headers_config(Config) ->
     {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
     {_, ExposedList} = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
     Exposed = cowboy_cors_utils:nonempty_list(ExposedList, fun cowboy_cors_utils:token/2),
+    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
     %% Postconfig
     set_all_env(OrigEnv).
 

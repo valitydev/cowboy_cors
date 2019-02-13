@@ -41,7 +41,7 @@ max_age(Req, State) ->
     {MaxAge, State}.
 
 parse_list(Name, Req) ->
-    #{Name := Value} = cowboy_req:match_qs([{Name, [], undefined}], Req),
+    #{Name := Value} = cowboy_req:match_qs([{Name, [nonempty], undefined}], Req),
     case Value of
         undefined ->
             [];
@@ -50,7 +50,7 @@ parse_list(Name, Req) ->
     end.
 
 parse_boolean(Name, Req, Default) ->
-    #{Name := Value} = cowboy_req:match_qs([{Name, [], undefined}], Req),
+    #{Name := Value} = cowboy_req:match_qs([{Name, [nonempty], undefined}], Req),
     case  Value of
         <<"true">> -> true;
         <<"false">> -> false;
@@ -58,12 +58,5 @@ parse_boolean(Name, Req, Default) ->
     end.
 
 parse_integer(Name, Req) ->
-    #{Name := Value} = cowboy_req:match_qs([{Name, [], undefined}], Req),
-    case Value of
-        undefined ->
-            undefined;
-        _ ->
-            String = binary_to_list(Value),
-            {MaxAge, []} = string:to_integer(String),
-            MaxAge
-    end.
+    #{Name := Value} = cowboy_req:match_qs([{Name, [int], undefined}], Req),
+    Value.
