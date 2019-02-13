@@ -13,58 +13,50 @@ policy_init(Req) ->
     {ok, Req, undefined_state}.
 
 allowed_origins(Req, State) ->
-    case parse_list(<<"allowed_origins">>, Req) of
-        {[<<"*">>], Req1} ->
-            {'*', Req1, State};
-        {Allowed, Req1} ->
-            {Allowed, Req1, State}
+    case parse_list(allowed_origins, Req) of
+        [<<"*">>] ->
+            {'*', State};
+        Allowed ->
+            {Allowed, State}
     end.
 
 allow_credentials(Req, State) ->
-    {IsAllowed, Req1} = parse_boolean(<<"allow_credentials">>, Req, false),
-    {IsAllowed, Req1, State}.
+    IsAllowed = parse_boolean(allow_credentials, Req, false),
+    {IsAllowed, State}.
 
 exposed_headers(Req, State) ->
-    {Exposed, Req1} = parse_list(<<"exposed_headers">>, Req),
-    {Exposed, Req1, State}.
+    Exposed = parse_list(exposed_headers, Req),
+    {Exposed, State}.
 
 allowed_headers(Req, State) ->
-    {Allowed, Req1} = parse_list(<<"allowed_headers">>, Req),
-    {Allowed, Req1, State}.
+    Allowed = parse_list(allowed_headers, Req),
+    {Allowed, State}.
 
 allowed_methods(Req, State) ->
-    {Allowed, Req1} = parse_list(<<"allowed_methods">>, Req),
-    {Allowed, Req1, State}.
+    Allowed = parse_list(allowed_methods, Req),
+    {Allowed, State}.
 
 max_age(Req, State) ->
-    {MaxAge, Req1} = parse_integer(<<"max_age">>, Req),
-    {MaxAge, Req1, State}.
+    MaxAge = parse_integer(max_age, Req),
+    {MaxAge, State}.
 
 parse_list(Name, Req) ->
-    case cowboy_req:qs_val(Name, Req) of
-        {undefined, Req1} ->
-            {[], Req1};
-        {Bin, Req1} ->
-            List = binary:split(Bin, <<",">>, [global]),
-            {List, Req1}
+    #{Name := Value} = cowboy_req:match_qs([{Name, [nonempty], undefined}], Req),
+    case Value of
+        undefined ->
+            [];
+        _ ->
+            binary:split(Value, <<",">>, [global])
     end.
 
 parse_boolean(Name, Req, Default) ->
-    case cowboy_req:qs_val(Name, Req) of
-        {undefined, Req1} ->
-            {Default, Req1};
-        {<<"true">>, Req1} ->
-            {true, Req1};
-        {<<"false">>, Req1} ->
-            {false, Req1}
+    #{Name := Value} = cowboy_req:match_qs([{Name, [nonempty], undefined}], Req),
+    case  Value of
+        <<"true">> -> true;
+        <<"false">> -> false;
+        undefined -> Default
     end.
 
 parse_integer(Name, Req) ->
-    case cowboy_req:qs_val(Name, Req) of
-        {undefined, Req1} ->
-            {undefined, Req1};
-        {Bin, Req1} ->
-            String = binary_to_list(Bin),
-            {MaxAge, []} = string:to_integer(String),
-            {MaxAge, Req1}
-    end.
+    #{Name := Value} = cowboy_req:match_qs([{Name, [int], undefined}], Req),
+    Value.
