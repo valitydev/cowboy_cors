@@ -18,12 +18,14 @@
           preflight = false      :: boolean(),
           allowed_methods = []   :: [binary()],
           allowed_headers = [<<"origin">>]   :: [binary()],
-          request_headers_present = true :: boolean(), 
+          request_headers_present = true :: boolean(),
 
           %% Policy handler.
           policy               :: atom(),
           policy_state         :: any()
 }).
+
+-type state() :: #state{}.
 
 %% @private
 execute(Req, Env) ->
@@ -223,7 +225,7 @@ terminate(Req, #state{preflight = true}) ->
 terminate(Req, #state{env = Env}) ->
     {ok, Req, Env}.
 
--spec error_terminate(cowboy_req:req(), #state{}) -> no_return().
+-spec error_terminate(cowboy_req:req(), state()) -> no_return().
 error_terminate(_Req, _State) ->
     erlang:throw({?MODULE, error}).
 
