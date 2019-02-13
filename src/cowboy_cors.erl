@@ -14,11 +14,10 @@
           method                 :: binary(),
           origin = <<>>          :: binary(),
           request_method  = <<>> :: binary(),
-          request_headers = []   :: [binary()],
+          request_headers = undefined   :: [binary()] | undefined,
           preflight = false      :: boolean(),
           allowed_methods = []   :: [binary()],
           allowed_headers = [<<"origin">>]   :: [binary()],
-          request_headers_present = true :: boolean(),
 
           %% Policy handler.
           policy               :: atom(),
@@ -89,20 +88,18 @@ request_method(Req, State) ->
     exposed_headers(Req, State).
 
 request_headers(Req, State) ->
-    ReqHeadersPresent =  maps:is_key(<<"access-control-request-headers">>, cowboy_req:headers(Req)),
-    Headers = case ReqHeadersPresent of
+    case maps:is_key(<<"access-control-request-headers">>, cowboy_req:headers(Req)) of
         true ->
             List = cowboy_req:header(<<"access-control-request-headers">>, Req),
             case cowboy_cors_utils:list(List, fun cowboy_cors_utils:token_ci/2) of
                 {error, badarg} ->
                     terminate(Req, State);
-                Value ->
-                    Value
+                Headers ->
+                    max_age(Req, State#state{request_headers = Headers})
             end;
         false ->
-            []
-    end,
-    max_age(Req, State#state{request_headers_present = ReqHeadersPresent, request_headers = Headers}).
+            max_age(Req, State#state{request_headers = undefined})
+    end.
 
 %% max_age/2 should return a non-negative integer or the atom undefined
 max_age(Req, State) ->
@@ -124,6 +121,9 @@ allowed_methods(Req, State = #state{request_method = Method}) ->
         true ->
             allowed_headers(Req, State#state{policy_state = PolicyState, allowed_methods = List})
     end.
+
+allowed_headers(Req, State = #state{request_headers = undefined}) ->
+    set_allow_methods(Req, State);
 
 allowed_headers(Req, State = #state{allowed_headers = Allowed, request_headers = Requested}) ->
     {List, PolicyState} = call(Req, State, allowed_headers, []),
@@ -149,16 +149,15 @@ set_allow_methods(Req, State = #state{allowed_methods = Methods}) ->
     Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, header_list(Methods), Req),
     set_allow_headers(Req1, State).
 
-set_allow_headers(Req0, State = #state{allowed_headers = Allowed, request_headers_present = ReqHeadersPresent}) ->
-    Headers = case ReqHeadersPresent of
-        true ->
-            header_list(Allowed);
-        false ->
-            <<>>
-    end,
+set_allow_headers(Req0, State) ->
+    Headers = get_allowed_headers(State),
     Req = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, Headers, Req0),
     allow_credentials(Req, State).
 
+get_allowed_headers(#state{request_headers = undefined}) ->
+    <<>>;
+get_allowed_headers(#state{allowed_headers = Allowed}) ->
+    header_list(Allowed).
 
 %% exposed_headers/2 should return a list of binary header names.
 exposed_headers(Req, State) ->
