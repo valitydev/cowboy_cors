@@ -88,17 +88,16 @@ request_method(Req, State) ->
     exposed_headers(Req, State).
 
 request_headers(Req, State) ->
-    case maps:is_key(<<"access-control-request-headers">>, cowboy_req:headers(Req)) of
-        true ->
-            List = cowboy_req:header(<<"access-control-request-headers">>, Req),
+    case cowboy_req:header(<<"access-control-request-headers">>, Req, undefined) of
+        undefined ->
+            max_age(Req, State#state{request_headers = undefined});
+        List ->
             case cowboy_cors_utils:list(List, fun cowboy_cors_utils:token_ci/2) of
                 {error, badarg} ->
                     terminate(Req, State);
                 Headers ->
                     max_age(Req, State#state{request_headers = Headers})
-            end;
-        false ->
-            max_age(Req, State#state{request_headers = undefined})
+            end
     end.
 
 %% max_age/2 should return a non-negative integer or the atom undefined
