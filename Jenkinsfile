@@ -7,7 +7,7 @@ def finalHook = {
   }
 }
 
-build('url-shortener', 'docker-host', finalHook) {
+build('cowboy_cors', 'docker-host', finalHook) {
   checkoutRepo()
   loadBuildUtils()
 
@@ -20,73 +20,33 @@ build('url-shortener', 'docker-host', finalHook) {
   }
 
   pipeDefault() {
-    if (env.BRANCH_NAME != 'master') {
+
+    if (!masterlikeBranch()) {
+
       runStage('compile') {
         withGithubPrivkey {
           sh 'make wc_compile'
         }
       }
+
       runStage('lint') {
         sh 'make wc_lint'
       }
+
       runStage('xref') {
         sh 'make wc_xref'
       }
-      runStage('dialyze') {
-        withWsCache("_build/default/rebar3_21.0.4_plt") {
-          sh 'make wc_dialyze'
-        }
-      }
-      runStage('test') {
-        sh "make wdeps_test"
-      }
-    }
-    runStage('make release') {
-      withGithubPrivkey {
-        sh "make wc_release"
-      }
-    }
-    runStage('build image') {
-      sh "make build_image"
-    }
 
-    try {
-      if (env.BRANCH_NAME == 'master' || env.BRANCH_NAME.startsWith('epic')) {
-        runStage('compile') {
-          withGithubPrivkey {
-            sh 'make wc_compile'
-          }
-        }
-        runStage('lint') {
-          sh 'make wc_lint'
-        }
-        runStage('xref') {
-          sh 'make wc_xref'
-        }
-        runStage('dialyze') {
-          withWsCache("_build/default/rebar3_21.0.4_plt") {
-            sh 'make wc_dialyze'
-          }
-        }
-        runStage('test') {
-          sh "make wdeps_test"
-        }
-        runStage('make release') {
-          withGithubPrivkey {
-            sh "make wc_release"
-          }
-        }
-        runStage('build image') {
-          sh "make build_image"
-        }
-        runStage('push image') {
-          sh "make push_image"
-        }
+      runStage('dialyze') {
+       withWsCache("_build/default/rebar3_21.1.1_plt") {
+         sh 'make wc_dialyze'
+       }
       }
-    } finally {
-      runStage('rm local image') {
-        sh 'make rm_local_image'
+
+      runStage('test') {
+        sh "make wc_test"
       }
+
     }
   }
 }
