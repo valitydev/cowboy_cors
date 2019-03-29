@@ -15,10 +15,7 @@
 -type state() :: any().
 -type req()   :: cowboy_req:req().
 
--callback policy_init(Req)
-        -> {ok, Req, state()}
-        when Req :: cowboy_req:req().
-
+-callback policy_init(Req) -> {ok, Req, state()} when Req :: cowboy_req:req().
 
 -spec policy_init(req()) -> {ok, req(), state()}.
 policy_init(Req) ->
@@ -27,40 +24,39 @@ policy_init(Req) ->
 %% @doc
 %%  Return whitelist origins.
 %% @end
--spec allowed_origins(req(), state()) -> {'*' | [binary()], req(), state()}.
-allowed_origins(Req, State) ->
+-spec allowed_origins(req(), state()) -> {'*' | [binary()], state()}.
+allowed_origins(_, State) ->
     ValidOrigins = application:get_env(cowboy_cors, origin_whitelist, []),
-    {ValidOrigins, Req, State}.
+    {ValidOrigins, State}.
 
 %% @doc
 %%  Indicates which headers can be exposed as part of the response.
 %%  Headers are read from configuration.
 %% @end
--spec exposed_headers(req(), state()) -> {[binary()], req(), state()}.
-exposed_headers(Req, State) ->
+-spec exposed_headers(req(), state()) -> {[binary()], state()}.
+exposed_headers(_, State) ->
     ExposedHeaders = application:get_env(cowboy_cors, exposed_headers, []),
-    {ExposedHeaders, Req, State}.
+    {ExposedHeaders, State}.
 
 %% @doc
 %%  Returns headers that are allowed to be passed in a pre-flight request.
 %% @end
--spec allowed_headers(req(), state()) -> {[binary()], req(), state()}.
-allowed_headers(Req, State) ->
+-spec allowed_headers(req(), state()) -> {[binary()], state()}.
+allowed_headers(_, State) ->
     AllowedHeaders = application:get_env(cowboy_cors, allowed_headers, []),
-    {AllowedHeaders, Req, State}.
+    {AllowedHeaders, State}.
 
--spec allow_credentials(req(), state()) -> {boolean(), req(), state()}.
-allow_credentials(Req, State) ->
+-spec allow_credentials(req(), state()) -> {boolean(), state()}.
+allow_credentials(_, State) ->
     Credential = application:get_env(cowboy_cors, allowed_credential, false),
-    {Credential, Req, State}.
+    {Credential, State}.
 
--spec allowed_methods(req(), state()) -> {[binary()], req(), state()}.
-allowed_methods(Req, State) ->
+-spec allowed_methods(req(), state()) -> {[binary()], state()}.
+allowed_methods(_, State) ->
     AllowedMethods = application:get_env(cowboy_cors, allowed_methods, []),
-    {AllowedMethods, Req, State}.
+    {AllowedMethods, State}.
 
--spec max_age(req(), state()) ->
-                     {non_neg_integer() | undefined, req(), state()}.
-max_age(Req, State) ->
+-spec max_age(req(), state()) -> {non_neg_integer() | undefined, state()}.
+max_age(_, State) ->
     MaxAgeSecs = application:get_env(cowboy_cors, max_age, undefined),
-    {MaxAgeSecs, Req, State}.
+    {MaxAgeSecs, State}.
