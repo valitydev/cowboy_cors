@@ -10,18 +10,18 @@
 -export([execute/2]).
 
 -record(state, {
-          env                    :: cowboy_middleware:env(),
-          method                 :: binary(),
-          origin = <<>>          :: binary(),
-          request_method  = <<>> :: binary(),
-          request_headers = undefined   :: [binary()] | undefined,
-          preflight = false      :: boolean(),
-          allowed_methods = []   :: [binary()],
-          allowed_headers = [<<"origin">>]   :: [binary()],
+    env :: cowboy_middleware:env(),
+    method :: binary(),
+    origin = <<>> :: binary(),
+    request_method = <<>> :: binary(),
+    request_headers = undefined :: [binary()] | undefined,
+    preflight = false :: boolean(),
+    allowed_methods = [] :: [binary()],
+    allowed_headers = [<<"origin">>] :: [binary()],
 
-          %% Policy handler.
-          policy               :: atom(),
-          policy_state         :: any()
+    %% Policy handler.
+    policy :: atom(),
+    policy_state :: any()
 }).
 
 -type state() :: #state{}.
@@ -48,14 +48,15 @@ policy_init(Req, State = #state{policy = Policy}) ->
     try Policy:policy_init(Req) of
         {ok, Req1, PolicyState} ->
             allowed_origins(Req1, State#state{policy_state = PolicyState})
-    catch Class:Reason:Stacktrace ->
-        error_logger:error_msg(
-            "** Cowboy CORS policy ~p terminating in ~p/~p~n"
-            "   for the reason ~p:~p~n"
-            "** Request was ~p~n** Stacktrace: ~p~n~n",
-            [Policy, policy_init, 1, Class, Reason, Req, Stacktrace]
-        ),
-        error_terminate(Req, State)
+    catch
+        Class:Reason:Stacktrace ->
+            error_logger:error_msg(
+                "** Cowboy CORS policy ~p terminating in ~p/~p~n"
+                "   for the reason ~p:~p~n"
+                "** Request was ~p~n** Stacktrace: ~p~n~n",
+                [Policy, policy_init, 1, Class, Reason, Req, Stacktrace]
+            ),
+            error_terminate(Req, State)
     end.
 
 %% allowed_origins/2 should return a list of origins or the atom '*'
@@ -80,7 +81,8 @@ request_method(Req, State = #state{method = <<"OPTIONS">>}) ->
         Data ->
             cowboy_cors_utils:token(
                 Data,
-                fun (<<>>, Method) ->
+                fun
+                    (<<>>, Method) ->
                         request_headers(Req, State#state{preflight = true, request_method = Method});
                     (_, _) ->
                         terminate(Req, State)
@@ -126,20 +128,22 @@ allowed_methods(Req, State = #state{request_method = Method}) ->
 
 allowed_headers(Req, State = #state{request_headers = undefined}) ->
     set_allow_methods(Req, State);
-
 allowed_headers(Req, State = #state{allowed_headers = Allowed, request_headers = Requested}) ->
     {List, PolicyState} = call(Req, State, allowed_headers, []),
-    check_allowed_headers(Requested, Req, State#state{policy_state = PolicyState, allowed_headers = Allowed ++ List}).
+    check_allowed_headers(Requested, Req, State#state{
+        policy_state = PolicyState,
+        allowed_headers = Allowed ++ List
+    }).
 
 check_allowed_headers([], Req, State) ->
     set_allow_methods(Req, State);
-check_allowed_headers([<<"origin">>|Tail], Req, State) ->
+check_allowed_headers([<<"origin">> | Tail], Req, State) ->
     %% KLUDGE: for browsers that include this header, but don't
     %% actually check it (i.e. Webkit).  Given that the 'Origin'
     %% header underpins the entire CORS framework, its inclusion in
     %% the requested headers is nonsensical.
     check_allowed_headers(Tail, Req, State);
-check_allowed_headers([Header|Tail], Req, State = #state{allowed_headers = Allowed}) ->
+check_allowed_headers([Header | Tail], Req, State = #state{allowed_headers = Allowed}) ->
     case lists:member(Header, Allowed) of
         false ->
             terminate(Req, State);
@@ -148,7 +152,11 @@ check_allowed_headers([Header|Tail], Req, State = #state{allowed_headers = Allow
     end.
 
 set_allow_methods(Req, State = #state{allowed_methods = Methods}) ->
-    Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, header_list(Methods), Req),
+    Req1 = cowboy_req:set_resp_header(
+        <<"access-control-allow-methods">>,
+        header_list(Methods),
+        Req
+    ),
     set_allow_headers(Req1, State).
 
 set_allow_headers(Req0, State) ->
@@ -175,8 +183,14 @@ set_exposed_headers(Req, Headers) ->
 
 %% allow_credentials/1 should return true or false.
 allow_credentials(Req, State) ->
-    expect(Req, State, allow_credentials, false,
-        fun if_not_allow_credentials/2, fun if_allow_credentials/2).
+    expect(
+        Req,
+        State,
+        allow_credentials,
+        false,
+        fun if_not_allow_credentials/2,
+        fun if_allow_credentials/2
+    ).
 
 %% If credentials are allowed, then the value of
 %% `Access-Control-Allow-Origin' is limited to the requesting origin.
@@ -207,14 +221,15 @@ call(Req, State = #state{policy = Policy, policy_state = PolicyState}, Callback,
         true ->
             try
                 Policy:Callback(Req, PolicyState)
-            catch Class:Reason:Stacktrace ->
-                error_logger:error_msg(
-                    "** Cowboy CORS policy ~p terminating in ~p/~p~n"
-                    "   for the reason ~p:~p~n"
-                    "** Request was ~p~n** Stacktrace: ~p~n~n",
-                    [Policy, Callback, 2, Class, Reason, Req, Stacktrace]
-                ),
-                error_terminate(Req, State)
+            catch
+                Class:Reason:Stacktrace ->
+                    error_logger:error_msg(
+                        "** Cowboy CORS policy ~p terminating in ~p/~p~n"
+                        "   for the reason ~p:~p~n"
+                        "** Request was ~p~n** Stacktrace: ~p~n~n",
+                        [Policy, Callback, 2, Class, Reason, Req, Stacktrace]
+                    ),
+                    error_terminate(Req, State)
             end;
         false ->
             {Default, PolicyState}

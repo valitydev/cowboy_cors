@@ -1,10 +1,8 @@
-{application, cowboy_cors,
-    [
-        {description, "Cross-Origin Resource Sharing middleware for cowboy"},
-        {vsn, "0.4.0"},
-        {modules, []},
-        {applications, [kernel, stdlib, cowboy]},
-        {registered, []},
-        {env, []}
-    ]
-}.
+{application, cowboy_cors, [
+    {description, "Cross-Origin Resource Sharing middleware for cowboy"},
+    {vsn, "0.4.0"},
+    {modules, []},
+    {applications, [kernel, stdlib, cowboy]},
+    {registered, []},
+    {env, []}
+]}.

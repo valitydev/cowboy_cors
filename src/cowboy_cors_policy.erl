@@ -11,9 +11,8 @@
 -export([allowed_headers/2]).
 -export([max_age/2]).
 
-
 -type state() :: any().
--type req()   :: cowboy_req:req().
+-type req() :: cowboy_req:req().
 
 -callback policy_init(Req) -> {ok, Req, state()} when Req :: cowboy_req:req().
 
