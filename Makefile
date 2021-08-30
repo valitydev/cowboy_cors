@@ -53,4 +53,4 @@ dialyze:
 	$(REBAR) dialyzer
 
 lint:
-	elvis rock
+    $(REBAR) lint
