@@ -10,7 +10,7 @@ SERVICE_NAME := cowboy_cors
 BUILD_IMAGE_NAME := build-erlang
 BUILD_IMAGE_TAG := aaa79c2d6b597f93f5f8b724eecfc31ec2e2a23b
 
-CALL_W_CONTAINER := all submodules rebar-update compile xref lint dialyze test clean distclean
+CALL_W_CONTAINER := all submodules rebar-update compile xref lint dialyze test clean distclean check_format format
 
 .PHONY: $(CALL_W_CONTAINER)
 
@@ -42,6 +42,12 @@ clean:
 distclean:
 	$(REBAR) clean -a
 	rm -rfv _build
+
+check_format:
+	$(REBAR) fmt -c
+
+format:
+	$(REBAR) fmt -w
 
 dialyze:
 	$(REBAR) dialyzer
