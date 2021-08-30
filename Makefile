@@ -53,4 +53,4 @@ dialyze:
 	$(REBAR) dialyzer
 
 lint:
-    $(REBAR) lint
+	$(REBAR) lint
