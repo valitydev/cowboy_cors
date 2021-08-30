@@ -7,7 +7,8 @@ UTILS_PATH := build_utils
 # with handling of the varriable in build_utils is fixed
 TEMPLATES_PATH := .
 SERVICE_NAME := cowboy_cors
-BUILD_IMAGE_TAG := f3732d29a5e622aabf80542b5138b3631a726adb
+BUILD_IMAGE_NAME := build-erlang
+BUILD_IMAGE_TAG := aaa79c2d6b597f93f5f8b724eecfc31ec2e2a23b
 
 CALL_W_CONTAINER := all submodules rebar-update compile xref lint dialyze test clean distclean
 
