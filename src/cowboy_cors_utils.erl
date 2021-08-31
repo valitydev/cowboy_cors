@@ -27,27 +27,27 @@ list(Data, Fun) ->
 list(Data, Fun, Acc) ->
     whitespace(
         Data,
-        fun
-            (<<>>) ->
-                Acc;
-            (<<$,, Rest/binary>>) ->
-                list(Rest, Fun, Acc);
-            (Rest) ->
-                Fun(
-                    Rest,
-                    fun(D, I) ->
-                        whitespace(
-                            D,
-                            fun
-                                (<<>>) -> [I | Acc];
-                                (<<$,, R/binary>>) -> list(R, Fun, [I | Acc]);
-                                (_Any) -> {error, badarg}
-                            end
-                        )
-                    end
-                )
+        fun(Str) -> list_first(Str, Fun, Acc) end
+    ).
+
+list_first(<<"">>, _Fun, Acc) ->
+    Acc;
+list_first(<<$,, Rest/binary>>, Fun, Acc) ->
+    list(Rest, Fun, Acc);
+list_first(Rest, Fun, Acc) ->
+    Fun(
+        Rest,
+        fun(D, I) ->
+            whitespace(
+                D,
+                fun(Next) -> list_next(Next, I, Fun, Acc) end
+            )
         end
     ).
+
+list_next(<<>>, Token, _, Acc) -> [Token | Acc];
+list_next(<<$,, R/binary>>, Token, Fun, Acc) -> list(R, Fun, [Token | Acc]);
+list_next(_Any, _, _, _) -> {error, badarg}.
 
 -spec whitespace(binary(), fun()) -> any().
 whitespace(<<C, Rest/binary>>, Fun) when C =:= $\s; C =:= $\t ->

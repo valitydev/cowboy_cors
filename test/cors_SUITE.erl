@@ -1,6 +1,7 @@
 -module(cors_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 %% ct callbacks
 -export([all/0]).
@@ -111,32 +112,19 @@ end_per_suite(_Config) ->
     application:stop(gun),
     ok.
 
-init_per_group(default = Name, Config) ->
+init_per_group(Name, Config) ->
+    Policy =
+        case Name of
+            default -> cors_default_policy;
+            policy -> cors_policy;
+            cors_config_policy -> cowboy_cors_policy
+        end,
+
     Middlewares = [cowboy_cors, cowboy_handler],
     Env = #{
         handler => cors_handler,
         handler_opts => [],
-        cors_policy => cors_default_policy
-    },
-    {ok, _} = cowboy:start_clear(Name, [{port, 0}], #{env => Env, middlewares => Middlewares}),
-    Port = ranch:get_port(Name),
-    [{port, Port} | Config];
-init_per_group(policy = Name, Config) ->
-    Middlewares = [cowboy_cors, cowboy_handler],
-    Env = #{
-        handler => cors_handler,
-        handler_opts => [],
-        cors_policy => cors_policy
-    },
-    {ok, _} = cowboy:start_clear(Name, [{port, 0}], #{env => Env, middlewares => Middlewares}),
-    Port = ranch:get_port(Name),
-    [{port, Port} | Config];
-init_per_group(cors_config_policy = Name, Config) ->
-    Middlewares = [cowboy_cors, cowboy_handler],
-    Env = #{
-        handler => cors_handler,
-        handler_opts => [],
-        cors_policy => cowboy_cors_policy
+        cors_policy => Policy
     },
     {ok, _} = cowboy:start_clear(Name, [{port, 0}], #{env => Env, middlewares => Middlewares}),
     Port = ranch:get_port(Name),
@@ -208,21 +196,21 @@ set_all_env(Params) ->
 
 standard_no_origin_get(Config) ->
     {ok, 200, Headers} = request(<<"GET">>, [], Config),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)).
 
 standard_no_origin_options(Config) ->
     {ok, 200, Headers} = request(<<"OPTIONS">>, [], Config),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)).
 
 standard_get(Config) ->
     Origin = <<"http://example.com">>,
     {ok, 200, Headers} = request(<<"GET">>, [{<<"Origin">>, Origin}], Config),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)).
 
 standard_options(Config) ->
     Origin = <<"http://example.com">>,
     {ok, 200, Headers} = request(<<"OPTIONS">>, [{<<"Origin">>, Origin}], Config),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers).
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)).
 
 simple_allowed_get(Config) ->
     Origin = <<"http://example.com">>,
@@ -236,8 +224,8 @@ simple_allowed_get(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers).
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)).
 
 simple_wildcard_get(Config) ->
     Origin = <<"http://example.com">>,
@@ -248,8 +236,8 @@ simple_wildcard_get(Config) ->
             [{allowed_origins, "*"}],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers).
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)).
 
 simple_allowed_credentials_get(Config) ->
     Origin = <<"http://example.com">>,
@@ -263,8 +251,8 @@ simple_allowed_credentials_get(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"true">>} = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers).
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"true">>, get_header(<<"access-control-allow-credentials">>, Headers)).
 
 simple_allowed_credentials_with_wildcard_origin(Config) ->
     Origin = <<"http://example.com">>,
@@ -279,8 +267,8 @@ simple_allowed_credentials_with_wildcard_origin(Config) ->
             Config
         ),
     %% We MUST not see "*" as the value for this header if credentials are allowed.
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"true">>} = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers).
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"true">>, get_header(<<"access-control-allow-credentials">>, Headers)).
 
 simple_exposed_headers(Config) ->
     Origin = <<"http://example.com">>,
@@ -296,10 +284,9 @@ simple_exposed_headers(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, ExposedList} = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
-    Exposed = cowboy_cors_utils:nonempty_list(ExposedList, fun cowboy_cors_utils:token/2),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers).
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(Exposed, get_expose_headers(Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)).
 
 actual_options(Config) ->
     %% OPTIONS request without Access-Control-Request-Method is not a pre-flight request.
@@ -311,9 +298,9 @@ actual_options(Config) ->
             [{allowed_origins, Origin}],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
     %% Ensure OPTIONS request was handled.
-    {_, <<"exposed">>} = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assertEqual(<<"exposed">>, get_header(<<"x-exposed">>, Headers)).
 
 preflight_method(Config) ->
     Origin = <<"http://example.com">>,
@@ -327,12 +314,12 @@ preflight_method(Config) ->
             [{allowed_origins, Origin}],
             Config
         ),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 preflight_allowed_method(Config) ->
     Origin = <<"http://example.com">>,
@@ -349,14 +336,14 @@ preflight_allowed_method(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, Allowed} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    Allowed = get_header(<<"access-control-allow-methods">>, Headers),
     true = lists:member(<<"GET">>, binary:split(Allowed, <<",">>)),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-max-age">>, 1, Headers),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
+    ?assert(not has_header(<<"access-control-max-age">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 preflight_credentials(Config) ->
     Origin = <<"http://example.com">>,
@@ -374,12 +361,12 @@ preflight_credentials(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, <<"true">>} = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"PUT">>, get_header(<<"access-control-allow-methods">>, Headers)),
+    ?assertEqual(<<"true">>, get_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 preflight_wildcard_origin(Config) ->
     Origin = <<"http://example.com">>,
@@ -396,13 +383,13 @@ preflight_wildcard_origin(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-max-age">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"PUT">>, get_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
+    ?assert(not has_header(<<"access-control-max-age">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 preflight_credentials_with_wildcard_origin(Config) ->
     Origin = <<"http://example.com">>,
@@ -420,13 +407,13 @@ preflight_credentials_with_wildcard_origin(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, <<"true">>} = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-max-age">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"PUT">>, get_header(<<"access-control-allow-methods">>, Headers)),
+    ?assertEqual(<<"true">>, get_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
+    ?assert(not has_header(<<"access-control-max-age">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 preflight_header(Config) ->
     Origin = <<"http://example.com">>,
@@ -446,13 +433,13 @@ preflight_header(Config) ->
             ],
             Config
         ),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-headers">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 preflight_allowed_header(Config) ->
     Origin = <<"http://example.com">>,
@@ -471,14 +458,13 @@ preflight_allowed_header(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
-    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"PUT">>, get_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(access_control_header_allowed(<<"x-requested">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 %% Test for Webkit browsers requesting 'Origin' header.
 preflight_allowed_header_webkit(Config) ->
@@ -498,14 +484,13 @@ preflight_allowed_header_webkit(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
-    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"PUT">>, get_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(access_control_header_allowed(<<"x-requested">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers).
+    ?assert(not has_header(<<"x-exposed">>, Headers)).
 
 preflight_max_age(Config) ->
     Origin = <<"http://example.com">>,
@@ -523,8 +508,8 @@ preflight_max_age(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"30">>} = lists:keyfind(<<"access-control-max-age">>, 1, Headers).
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"30">>, get_header(<<"access-control-max-age">>, Headers)).
 
 % if max age is negative, middleware IS TO FAIL
 
@@ -566,14 +551,13 @@ origin_whitelist_allowed_all(Config) ->
             [],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
-    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"PUT">>, get_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(access_control_header_allowed(<<"x-requested">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
+    ?assert(not has_header(<<"access-control-expose-headers">>, Headers)),
     %% Pre-flight requests should not be completed by the handler.
-    false = lists:keyfind(<<"x-exposed">>, 1, Headers),
+    ?assert(not has_header(<<"x-exposed">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -596,9 +580,9 @@ origin_whitelist_unavail(Config) ->
             [],
             Config
         ),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-headers">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -620,9 +604,9 @@ origin_whitelist_not_member(Config) ->
             [],
             Config
         ),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-headers">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -646,11 +630,10 @@ credential_enabled(Config) ->
             [],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"PUT">>} = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    {_, Allowed} = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
-    true = lists:member(<<"x-requested">>, binary:split(Allowed, <<",">>, [global])),
-    {_, <<"true">>} = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"PUT">>, get_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(access_control_header_allowed(<<"x-requested">>, Headers)),
+    ?assertEqual(<<"true">>, get_header(<<"access-control-allow-credentials">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -672,9 +655,9 @@ request_headers_not_allowed(Config) ->
             [],
             Config
         ),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-headers">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -697,9 +680,9 @@ request_methods_not_allowed(Config) ->
             [],
             Config
         ),
-    false = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-methods">>, 1, Headers),
-    false = lists:keyfind(<<"access-control-allow-headers">>, 1, Headers),
+    ?assert(not has_header(<<"access-control-allow-origin">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-methods">>, Headers)),
+    ?assert(not has_header(<<"access-control-allow-headers">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -723,10 +706,9 @@ exposed_headers_config(Config) ->
             ],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, ExposedList} = lists:keyfind(<<"access-control-expose-headers">>, 1, Headers),
-    Exposed = cowboy_cors_utils:nonempty_list(ExposedList, fun cowboy_cors_utils:token/2),
-    false = lists:keyfind(<<"access-control-allow-credentials">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(Exposed, get_expose_headers(Headers)),
+    ?assert(not has_header(<<"access-control-allow-credentials">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
 
@@ -750,7 +732,26 @@ max_age_enabled(Config) ->
             [],
             Config
         ),
-    {_, Origin} = lists:keyfind(<<"access-control-allow-origin">>, 1, Headers),
-    {_, <<"30">>} = lists:keyfind(<<"access-control-max-age">>, 1, Headers),
+    ?assertEqual(Origin, get_header(<<"access-control-allow-origin">>, Headers)),
+    ?assertEqual(<<"30">>, get_header(<<"access-control-max-age">>, Headers)),
     %% Postconfig
     set_all_env(OrigEnv).
+
+get_header(Header, Headers) ->
+    {Header, Value} = lists:keyfind(Header, 1, Headers),
+    Value.
+
+has_header(Header, Headers) ->
+    false /= lists:keyfind(Header, 1, Headers).
+
+get_expose_headers(Headers) ->
+    ExposedList = get_header(<<"access-control-expose-headers">>, Headers),
+    cowboy_cors_utils:nonempty_list(ExposedList, fun cowboy_cors_utils:token/2).
+
+access_control_header_allowed(Header, Headers) ->
+    case lists:keyfind(<<"access-control-allow-headers">>, 1, Headers) of
+        {_, AllowedList} ->
+            lists:member(Header, binary:split(AllowedList, <<",">>, [global]));
+        false ->
+            false
+    end.

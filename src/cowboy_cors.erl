@@ -24,6 +24,21 @@
     policy_state :: any()
 }).
 
+-type req() :: cowboy_req:req().
+-type policy_state() :: any().
+
+-type origins() :: '*' | [string()].
+
+%% @doc Possible (correct, but not enforced) values:
+%% <<"GET">> | <<"POST">> | <<"PUT">> | <<"DELETE">> | <<"OPTIONS">>.
+-type method() :: binary().
+-type header() :: binary().
+
+-callback policy_init(req()) -> {ok, req(), policy_state()}.
+-callback allowed_origins(req(), policy_state()) -> {origins(), policy_state()}.
+-callback allowed_headers(req(), policy_state()) -> {[header()], policy_state()}.
+-callback allowed_methods(req(), policy_state()) -> {[method()], policy_state()}.
+
 -type state() :: #state{}.
 -type env() :: cowboy_middleware:env().
 -type request() :: cowboy_req:req().
